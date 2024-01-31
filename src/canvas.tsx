@@ -21,9 +21,38 @@ export function ReactCanvas({ children }: CanvasProps) {
   };
 
   useEffect(() => {
-    children.forEach((child, index) => {
-      const id = `canvas-element-${index}`;
-      setComponents(prev => [...prev, { component: child, id, x: 100 * index, y: 100 * index }]);
+    React.Children.forEach(children, (child) => {
+      if (React.isValidElement(child) && child.props.id) {
+        const { id, position, ...restProps } = child.props;
+  
+        let initialPosition = position;
+        if (!initialPosition) {
+          const defaultWidth = 100; 
+          const defaultHeight = 100;
+          initialPosition = {
+            x: (window.innerWidth - defaultWidth) / 2,
+            y: (window.innerHeight - defaultHeight) / 2
+          };
+        }
+  
+        const newComponent = {
+          id,
+          component: child,
+          x: initialPosition.x,
+          y: initialPosition.y,
+          ...restProps,
+          style: { ...(restProps.style || {}), position: 'absolute', left: initialPosition.x, top: initialPosition.y }
+        };
+        setComponents(prev => {
+          const index = prev.findIndex(comp => comp.id === id);
+          if (index !== -1) {
+            const updatedComponents = [...prev];
+            updatedComponents[index] = newComponent;
+            return updatedComponents;
+          }
+          return [...prev, newComponent];
+        });
+      }
     });
   }, [children]);
 
