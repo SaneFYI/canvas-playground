@@ -1,9 +1,10 @@
+import { ReactCanvas } from "./canvas";
+
 export default function App() {
   return (
-    <>
-      <h1 className="text-3xl font-bold underline">
-        Hello world!
-      </h1>
-    </>
+    <ReactCanvas>
+      <div>Your First Component</div>
+      <div>Your Second Component</div>
+    </ReactCanvas>
   )
 }
