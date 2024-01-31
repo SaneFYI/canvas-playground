@@ -1,6 +1,6 @@
 {
-  "name": "react-ts",
-  "private": true,
+  "name": "canvas-playground",
+  "license": "Unlicense",
   "version": "0.0.0",
   "type": "module",
   "scripts": {
