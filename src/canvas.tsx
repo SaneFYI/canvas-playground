@@ -12,7 +12,23 @@ interface PositionedComponent {
 }
 
 interface Connection {
-  ids: string[];
+  componentIds: string[];
+  midpoints: { x: number, y: number }[];
+}
+
+function calculateMidpointOfElement(el: HTMLElement) {
+  const rect = el.getBoundingClientRect();
+
+  return {
+    x: rect.right - (rect.width / 2),
+    y: rect.top + (rect.height / 2)
+  }
+}
+
+function getIdOnDrop(el: HTMLElement): string {
+  const componentId = el.id || getIdOnDrop(el.parentElement as HTMLElement);
+
+  return componentId === 'root' ? '' : componentId;
 }
 
 export function ReactCanvas({ children }: CanvasProps) {
@@ -25,7 +41,7 @@ export function ReactCanvas({ children }: CanvasProps) {
     ));
   };
 
-  useEffect(() => {
+  useEffect(() => {    
     React.Children.forEach(children, (child) => {
       if (React.isValidElement(child) && child.props.id) {
         const { id, position, ...restProps } = child.props;
@@ -74,7 +90,7 @@ export function ReactCanvas({ children }: CanvasProps) {
   const onDrop = (event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
     const dragId = event.dataTransfer.getData('text/plain'); // component that is being dragged
-    const dropId = event.target.id; // component that is getting dropped on
+    const dropId =  getIdOnDrop(event.target) // component that is getting dropped on
     const offsetX = parseFloat(event.dataTransfer.getData('text/offset-x'));
     const offsetY = parseFloat(event.dataTransfer.getData('text/offset-y'));
     const x = event.clientX - offsetX;
@@ -87,22 +103,33 @@ export function ReactCanvas({ children }: CanvasProps) {
     }
 
     const existingConnection = connections.find(connection =>
-        connection.ids.includes(dragId) && connection.ids.includes(dropId));
+        connection.componentIds.includes(dragId) && connection.componentIds.includes(dropId));
 
     if (!existingConnection) {
+      const dragEl = document.getElementById(dragId);
+      const dropEl = document.getElementById(dropId);
+      const dragMidpoint = dragEl ? calculateMidpointOfElement(dragEl) : {x: 0, y: 0};
+      const dropMidpoint = dropEl ? calculateMidpointOfElement(dropEl) : {x: 0, y: 0};
       console.log('should connect', dragId, dropId)
       setConnections(prev => [...prev, {
-        ids: [dragId, dropId],
+        id: `${dragId}-${dropId}`,
+        componentIds: [dragId, dropId],
+        midpoints: [dragMidpoint, dropMidpoint]
       }]);
     } else {
       console.log('should disconnect', dragId, dropId)
-      setConnections(prev => prev.filter(connection => !connection.ids.includes(dragId) || !connection.ids.includes(dropId)));
+      setConnections(prev => prev.filter(connection => !connection.componentIds.includes(dragId) || !connection.componentIds.includes(dropId)));
     }
   };
 
 
   return (
     <div className="w-full h-full fixed top-0 left-0" onDragOver={onDragOver} onDrop={onDrop}>
+      <svg className="w-full h-full absolute top-0 left-0" >
+        {connections.map(item => (
+          <line key={item.id} x1={item.midpoints[0].x.toString()} y1={item.midpoints[0].y.toString()} x2={item.midpoints[1].x.toString()} y2={item.midpoints[1].y.toString()} style={{ stroke: 'black', strokeWidth: 2 }} />
+        ))}
+      </svg>
       {components.map((item) => (
         <div
           key={item.id}
