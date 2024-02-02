@@ -12,6 +12,7 @@ interface PositionedComponent {
 }
 
 interface Connection {
+  id: string;
   componentIds: string[];
   midpoints: { x: number, y: number }[];
 }
@@ -41,7 +42,7 @@ export function ReactCanvas({ children }: CanvasProps) {
     ));
   };
 
-  useEffect(() => {    
+  useEffect(() => {
     React.Children.forEach(children, (child) => {
       if (React.isValidElement(child) && child.props.id) {
         const { id, position, ...restProps } = child.props;
@@ -97,11 +98,11 @@ export function ReactCanvas({ children }: CanvasProps) {
       return prev.map(connection => {
         if (connection.componentIds.includes(id)) {
           const otherId = connection.componentIds.find(componentId => componentId !== id);
-          const connectedEl = document.getElementById(otherId);
+          const connectedEl = otherId ? document.getElementById(otherId) : null;
 
           connection.midpoints = [
             {x: event.clientX, y: event.clientY},
-            calculateMidpointOfElement(connectedEl) || {x: 0, y: 0},
+            connectedEl ? calculateMidpointOfElement(connectedEl) : {x: 0, y: 0}
           ]
         }
 
@@ -113,7 +114,7 @@ export function ReactCanvas({ children }: CanvasProps) {
   const onDrop = (event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
     const dragId = event.dataTransfer.getData('text/plain'); // component that is being dragged
-    const dropId =  getIdOnDrop(event.target) // component that is getting dropped on
+    const dropId = getIdOnDrop(event.target as HTMLElement) // component that is getting dropped on
     const offsetX = parseFloat(event.dataTransfer.getData('text/offset-x'));
     const offsetY = parseFloat(event.dataTransfer.getData('text/offset-y'));
     const x = event.clientX - offsetX;
@@ -133,14 +134,12 @@ export function ReactCanvas({ children }: CanvasProps) {
       const dropEl = document.getElementById(dropId);
       const dragMidpoint = dragEl ? calculateMidpointOfElement(dragEl) : {x: 0, y: 0};
       const dropMidpoint = dropEl ? calculateMidpointOfElement(dropEl) : {x: 0, y: 0};
-      console.log('should connect', dragId, dropId)
       setConnections(prev => [...prev, {
         id: `${dragId}-${dropId}`,
         componentIds: [dragId, dropId],
         midpoints: [dragMidpoint, dropMidpoint]
       }]);
     } else {
-      console.log('should disconnect', dragId, dropId)
       setConnections(prev => prev.filter(connection => !connection.componentIds.includes(dragId) || !connection.componentIds.includes(dropId)));
     }
   };
