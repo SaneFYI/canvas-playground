@@ -11,8 +11,13 @@ interface PositionedComponent {
   y: number;
 }
 
+interface Connection {
+  ids: string[];
+}
+
 export function ReactCanvas({ children }: CanvasProps) {
   const [components, setComponents] = useState<PositionedComponent[]>([]);
+  const [connections, setConnections] = useState<Connection[]>([]);
 
   const moveComponent = (id: string, newX: number, newY: number) => {
     setComponents(prev => prev.map(comp => 
@@ -68,12 +73,31 @@ export function ReactCanvas({ children }: CanvasProps) {
 
   const onDrop = (event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
-    const id = event.dataTransfer.getData('text/plain');
+    const dragId = event.dataTransfer.getData('text/plain'); // component that is being dragged
+    const dropId = event.target.id; // component that is getting dropped on
     const offsetX = parseFloat(event.dataTransfer.getData('text/offset-x'));
     const offsetY = parseFloat(event.dataTransfer.getData('text/offset-y'));
     const x = event.clientX - offsetX;
     const y = event.clientY - offsetY;
-    moveComponent(id, x, y);
+    
+    // handle case where drag does not end on another component
+    if (!dropId || dropId === dragId) {
+      moveComponent(dragId, x, y);
+      return;
+    }
+
+    const existingConnection = connections.find(connection =>
+        connection.ids.includes(dragId) && connection.ids.includes(dropId));
+
+    if (!existingConnection) {
+      console.log('should connect', dragId, dropId)
+      setConnections(prev => [...prev, {
+        ids: [dragId, dropId],
+      }]);
+    } else {
+      console.log('should disconnect', dragId, dropId)
+      setConnections(prev => prev.filter(connection => !connection.ids.includes(dragId) || !connection.ids.includes(dropId)));
+    }
   };
 
 
