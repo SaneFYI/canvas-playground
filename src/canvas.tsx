@@ -87,6 +87,29 @@ export function ReactCanvas({ children }: CanvasProps) {
     event.preventDefault();
   };
 
+  const onDragComponentOver = (event: React.DragEvent<HTMLDivElement>, id: string) => {
+    event.preventDefault();
+    setConnections(prev => {
+      if (prev.length === 0) {
+        return prev;
+      }
+
+      return prev.map(connection => {
+        if (connection.componentIds.includes(id)) {
+          const otherId = connection.componentIds.find(componentId => componentId !== id);
+          const connectedEl = document.getElementById(otherId);
+
+          connection.midpoints = [
+            {x: event.clientX, y: event.clientY},
+            calculateMidpointOfElement(connectedEl) || {x: 0, y: 0},
+          ]
+        }
+
+        return connection;
+      });
+    })
+  }
+
   const onDrop = (event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
     const dragId = event.dataTransfer.getData('text/plain'); // component that is being dragged
@@ -125,7 +148,7 @@ export function ReactCanvas({ children }: CanvasProps) {
 
   return (
     <div className="w-full h-full fixed top-0 left-0" onDragOver={onDragOver} onDrop={onDrop}>
-      <svg className="w-full h-full absolute top-0 left-0" >
+      <svg className="w-full h-full absolute top-0 left-0" style={{ zIndex: '-1' }}>
         {connections.map(item => (
           <line key={item.id} x1={item.midpoints[0].x.toString()} y1={item.midpoints[0].y.toString()} x2={item.midpoints[1].x.toString()} y2={item.midpoints[1].y.toString()} style={{ stroke: 'black', strokeWidth: 2 }} />
         ))}
@@ -135,6 +158,7 @@ export function ReactCanvas({ children }: CanvasProps) {
           key={item.id}
           draggable
           onDragStart={(e) => onDragStart(e, item.id)}
+          onDragOver={(e) => onDragComponentOver(e, item.id)}
           style={{ position: 'absolute', left: item.x, top: item.y }}
         >
           {item.component}
