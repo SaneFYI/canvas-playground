@@ -17,7 +17,7 @@ interface Connection {
   midpoints: { x: number, y: number }[];
 }
 
-function calculateMidpointOfElement(el: HTMLElement) {
+const calculateMidpointOfElement = (el: HTMLElement) => {
   const rect = el.getBoundingClientRect();
 
   return {
@@ -26,7 +26,7 @@ function calculateMidpointOfElement(el: HTMLElement) {
   }
 }
 
-function getIdOnDrop(el: HTMLElement): string {
+const getIdOnDrop = (el: HTMLElement): string => {
   const componentId = el.id || getIdOnDrop(el.parentElement as HTMLElement);
 
   return componentId === 'root' ? '' : componentId;
@@ -37,9 +37,43 @@ export function ReactCanvas({ children }: CanvasProps) {
   const [connections, setConnections] = useState<Connection[]>([]);
 
   const moveComponent = (id: string, newX: number, newY: number) => {
-    setComponents(prev => prev.map(comp => 
-      comp.id === id ? { ...comp, x: newX, y: newY } : comp
-    ));
+    setComponents(prev => prev.map(comp => {
+      return comp.id === id ? { ...comp, x: newX, y: newY } : comp
+    }));
+  };
+
+  const addConnection = (id1: string, id2: string) => {
+    const el1 = document.getElementById(id1);
+    const el2 = document.getElementById(id2);
+    const dragMidpoint = el1 ? calculateMidpointOfElement(el1) : {x: 0, y: 0};
+    const dropMidpoint = el2 ? calculateMidpointOfElement(el2) : {x: 0, y: 0};
+    setConnections(prev => [...prev, {
+      id: `${id1}-${id2}`,
+      componentIds: [id1, id2],
+      midpoints: [dragMidpoint, dropMidpoint]
+    }]);
+  };
+
+  const removeConnection = (id1: string, id2: string) => {
+    setConnections(prev => prev.filter(connection =>
+      !connection.componentIds.includes(id1) || !connection.componentIds.includes(id2)));
+  }
+
+  const drawConnectionsToComponent = (x: number, y: number, componentId: string): void => {
+    setConnections(prev => {
+      return prev.map(connection => {
+        if (connection.componentIds.includes(componentId)) {
+          const otherId = connection.componentIds.find(id => id !== componentId);
+          const connectedEl = otherId ? document.getElementById(otherId) : null;
+          connection.midpoints = [
+            {x, y},
+            connectedEl ? calculateMidpointOfElement(connectedEl) : {x: 0, y: 0}
+          ]
+        }
+
+        return connection;
+      });
+    })
   };
 
   useEffect(() => {
@@ -79,37 +113,22 @@ export function ReactCanvas({ children }: CanvasProps) {
   }, [children]);
 
   const onDragStart = (event: React.DragEvent<HTMLDivElement>, id: string) => {
+    const boundingRect = event.currentTarget.getBoundingClientRect();
+    const midpoint = calculateMidpointOfElement(event.currentTarget);
     event.dataTransfer.setData('text/plain', id);
-    event.dataTransfer.setData('text/offset-x', String(event.clientX - event.currentTarget.getBoundingClientRect().left));
-    event.dataTransfer.setData('text/offset-y', String(event.clientY - event.currentTarget.getBoundingClientRect().top));
+    event.dataTransfer.setData('text/offset-x', String(event.clientX - boundingRect.left));
+    event.dataTransfer.setData('text/offset-y', String(event.clientY - boundingRect.top));
+    event.dataTransfer.setData('text/drag-start-x', String(midpoint.x));
+    event.dataTransfer.setData('text/drag-start-y', String(midpoint.y));
+    event.dataTransfer.setData('text/drag-width', String(boundingRect.width));
+    event.dataTransfer.setData('text/drag-height', String(boundingRect.height));
   };
 
   const onDragOver = (event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
+    const dragId = event.dataTransfer.getData('text/plain');
+    drawConnectionsToComponent(event.clientX, event.clientY, dragId);
   };
-
-  const onDragComponentOver = (event: React.DragEvent<HTMLDivElement>, id: string) => {
-    event.preventDefault();
-    setConnections(prev => {
-      if (prev.length === 0) {
-        return prev;
-      }
-
-      return prev.map(connection => {
-        if (connection.componentIds.includes(id)) {
-          const otherId = connection.componentIds.find(componentId => componentId !== id);
-          const connectedEl = otherId ? document.getElementById(otherId) : null;
-
-          connection.midpoints = [
-            {x: event.clientX, y: event.clientY},
-            connectedEl ? calculateMidpointOfElement(connectedEl) : {x: 0, y: 0}
-          ]
-        }
-
-        return connection;
-      });
-    })
-  }
 
   const onDrop = (event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
@@ -117,31 +136,31 @@ export function ReactCanvas({ children }: CanvasProps) {
     const dropId = getIdOnDrop(event.target as HTMLElement) // component that is getting dropped on
     const offsetX = parseFloat(event.dataTransfer.getData('text/offset-x'));
     const offsetY = parseFloat(event.dataTransfer.getData('text/offset-y'));
+    const dragStartX = parseFloat(event.dataTransfer.getData('text/drag-start-x'));
+    const dragStartY = parseFloat(event.dataTransfer.getData('text/drag-start-y'));
+    const dragWidth = parseFloat(event.dataTransfer.getData('text/drag-width'));
+    const dragHeight = parseFloat(event.dataTransfer.getData('text/drag-height'));
     const x = event.clientX - offsetX;
     const y = event.clientY - offsetY;
     
     // handle case where drag does not end on another component
     if (!dropId || dropId === dragId) {
       moveComponent(dragId, x, y);
+      const newMidpointX = event.clientX - offsetX + dragWidth / 2;
+      const newMidpointY = event.clientY - offsetY + dragHeight / 2;
+      drawConnectionsToComponent(newMidpointX, newMidpointY, dragId)
       return;
     }
 
     const existingConnection = connections.find(connection =>
         connection.componentIds.includes(dragId) && connection.componentIds.includes(dropId));
 
-    if (!existingConnection) {
-      const dragEl = document.getElementById(dragId);
-      const dropEl = document.getElementById(dropId);
-      const dragMidpoint = dragEl ? calculateMidpointOfElement(dragEl) : {x: 0, y: 0};
-      const dropMidpoint = dropEl ? calculateMidpointOfElement(dropEl) : {x: 0, y: 0};
-      setConnections(prev => [...prev, {
-        id: `${dragId}-${dropId}`,
-        componentIds: [dragId, dropId],
-        midpoints: [dragMidpoint, dropMidpoint]
-      }]);
-    } else {
-      setConnections(prev => prev.filter(connection => !connection.componentIds.includes(dragId) || !connection.componentIds.includes(dropId)));
-    }
+    existingConnection ?
+      removeConnection(dragId, dropId) :
+      addConnection(dragId, dropId);
+
+    // redraw the connections to reflect original position of the dragged component
+    drawConnectionsToComponent(dragStartX, dragStartY, dragId);
   };
 
 
@@ -157,7 +176,6 @@ export function ReactCanvas({ children }: CanvasProps) {
           key={item.id}
           draggable
           onDragStart={(e) => onDragStart(e, item.id)}
-          onDragOver={(e) => onDragComponentOver(e, item.id)}
           style={{ position: 'absolute', left: item.x, top: item.y }}
         >
           {item.component}
