@@ -8,7 +8,7 @@ export interface CanvasElementProps extends Omit<HTMLAttributes<HTMLDivElement>,
 
 export function CanvasElement({ id, children, ...rest }: CanvasElementProps) {
   return (
-    <div id={id} {...rest}>
+    <div id={id} {...rest} className="bg-white">
       {children}
     </div>
   )
